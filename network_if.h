@@ -58,6 +58,7 @@ extern "C"
 /* properties SimpleLink device will connect to following AP when application */
 /* is executed.                                                               */
 
+
 /* AP SSID                                                                    */
 #define SSID_NAME               "aalto open"
 /* Security type (OPEN or WEP or WPA or WPA_WPA2)                             */

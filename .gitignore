@@ -1,5 +1,5 @@
 #Ignore the network configuration header
-network_if.h
+/network_if.h
 
 #Ignore Debug folder
 /Debug
