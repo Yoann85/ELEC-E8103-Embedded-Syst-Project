@@ -34,6 +34,7 @@
 /*
  *  ======== main_tirtos.c ========
  */
+
 #include <stdint.h>
 
 /* POSIX Header files */
@@ -46,7 +47,6 @@
 #include <ti/drivers/GPIO.h>
 
 /* TI-DRIVERS Header files */
-
 #include "ti_drivers_config.h"
 
 extern void * mainThread(void *arg0);

@@ -555,17 +555,17 @@ void * MqttClient(void *pvParameters)
             if(strncmp
                 (tmpBuff, SUBSCRIPTION_TOPIC1, queueElemRecv.topLen) == 0)
             {
-                GPIO_toggle(CONFIG_GPIO_LED_0);
+                //GPIO_toggle(CONFIG_GPIO_LED_0);
             }
             else if(strncmp(tmpBuff, SUBSCRIPTION_TOPIC2,
                             queueElemRecv.topLen) == 0)
             {
-                GPIO_toggle(CONFIG_GPIO_LED_1);
+                //GPIO_toggle(CONFIG_GPIO_LED_1);
             }
             else if(strncmp(tmpBuff, SUBSCRIPTION_TOPIC3,
                             queueElemRecv.topLen) == 0)
             {
-                GPIO_toggle(CONFIG_GPIO_LED_2);
+                //GPIO_toggle(CONFIG_GPIO_LED_2);
             }
 
             free(queueElemRecv.msgPtr);
@@ -1102,126 +1102,126 @@ int32_t DisplayAppBanner(char* appName,
     return(ret);
 }
 
-void mainThread(void * args)
-{
-    uint32_t count = 0;
-    pthread_t spawn_thread = (pthread_t) NULL;
-    pthread_attr_t pAttrs_spawn;
-    struct sched_param priParam;
-    int32_t retc = 0;
-    UART_Handle tUartHndl;
-
-    /*Initialize SlNetSock layer with CC31xx/CC32xx interface */
-    SlNetIf_init(0);
-    SlNetIf_add(SLNETIF_ID_1, "CC32xx",
-                (const SlNetIf_Config_t *)&SlNetIfConfigWifi,
-                SLNET_IF_WIFI_PRIO);
-
-    SlNetSock_init(0);
-    SlNetUtil_init(0);
-
-    GPIO_init();
-    SPI_init();
-
-    /*Configure the UART                                                     */
-    tUartHndl = InitTerm();
-    /*remove uart receive from LPDS dependency                               */
-    UART_control(tUartHndl, UART_CMD_RXDISABLE, NULL);
-
-    /*Create the sl_Task                                                     */
-    pthread_attr_init(&pAttrs_spawn);
-    priParam.sched_priority = SPAWN_TASK_PRIORITY;
-    retc = pthread_attr_setschedparam(&pAttrs_spawn, &priParam);
-    retc |= pthread_attr_setstacksize(&pAttrs_spawn, TASKSTACKSIZE);
-    retc |= pthread_attr_setdetachstate
-                                    (&pAttrs_spawn, PTHREAD_CREATE_DETACHED);
-
-    retc = pthread_create(&spawn_thread, &pAttrs_spawn, sl_Task, NULL);
-
-    if(retc != 0)
-    {
-        UART_PRINT("could not create simplelink task\n\r");
-        while(1)
-        {
-            ;
-        }
-    }
-
-    retc = sl_Start(0, 0, 0);
-    if(retc < 0)
-    {
-        /*Handle Error */
-        UART_PRINT("\n sl_Start failed\n");
-        while(1)
-        {
-            ;
-        }
-    }
-
-    /*Output device information to the UART terminal */
-    retc = DisplayAppBanner(APPLICATION_NAME, APPLICATION_VERSION);
-    /*Set the ClientId with its own mac address */
-    retc |= SetClientIdNamefromMacAddress();
-
-
-    retc = sl_Stop(SL_STOP_TIMEOUT);
-    if(retc < 0)
-    {
-        /*Handle Error */
-        UART_PRINT("\n sl_Stop failed\n");
-        while(1)
-        {
-            ;
-        }
-    }
-
-    if(retc < 0)
-    {
-        /*Handle Error */
-        UART_PRINT("mqtt_client - Unable to retrieve device information \n");
-        while(1)
-        {
-            ;
-        }
-    }
-
-    while(1)
-    {
-        gResetApplication = false;
-        topic[0] = SUBSCRIPTION_TOPIC0;
-        topic[1] = SUBSCRIPTION_TOPIC1;
-        topic[2] = SUBSCRIPTION_TOPIC2;
-        topic[3] = SUBSCRIPTION_TOPIC3;
-        gInitState = 0;
-
-        /*Connect to AP                                                      */
-        gApConnectionState = Mqtt_IF_Connect();
-
-        gInitState |= MQTT_INIT_STATE;
-        /*Run MQTT Main Thread (it will open the Client and Server)          */
-        Mqtt_start();
-
-        /*Wait for init to be completed!!!                                   */
-        while(gInitState != 0)
-        {
-            UART_PRINT(".");
-            sleep(1);
-        }
-        UART_PRINT(".\r\n");
-
-        while(gResetApplication == false)
-        {
-            ;
-        }
-
-        UART_PRINT("TO Complete - Closing all threads and resources\r\n");
-
-        /*Stop the MQTT Process                                              */
-        Mqtt_Stop();
-
-        UART_PRINT("reopen MQTT # %d  \r\n", ++count);
-    }
-}
+//void mainThread(void * args)
+//{
+//    uint32_t count = 0;
+//    pthread_t spawn_thread = (pthread_t) NULL;
+//    pthread_attr_t pAttrs_spawn;
+//    struct sched_param priParam;
+//    int32_t retc = 0;
+//    UART_Handle tUartHndl;
+//
+//    /*Initialize SlNetSock layer with CC31xx/CC32xx interface */
+//    SlNetIf_init(0);
+//    SlNetIf_add(SLNETIF_ID_1, "CC32xx",
+//                (const SlNetIf_Config_t *)&SlNetIfConfigWifi,
+//                SLNET_IF_WIFI_PRIO);
+//
+//    SlNetSock_init(0);
+//    SlNetUtil_init(0);
+//
+//    GPIO_init();
+//    SPI_init();
+//
+//    /*Configure the UART                                                     */
+//    tUartHndl = InitTerm();
+//    /*remove uart receive from LPDS dependency                               */
+//    UART_control(tUartHndl, UART_CMD_RXDISABLE, NULL);
+//
+//    /*Create the sl_Task                                                     */
+//    pthread_attr_init(&pAttrs_spawn);
+//    priParam.sched_priority = SPAWN_TASK_PRIORITY;
+//    retc = pthread_attr_setschedparam(&pAttrs_spawn, &priParam);
+//    retc |= pthread_attr_setstacksize(&pAttrs_spawn, TASKSTACKSIZE);
+//    retc |= pthread_attr_setdetachstate
+//                                    (&pAttrs_spawn, PTHREAD_CREATE_DETACHED);
+//
+//    retc = pthread_create(&spawn_thread, &pAttrs_spawn, sl_Task, NULL);
+//
+//    if(retc != 0)
+//    {
+//        UART_PRINT("could not create simplelink task\n\r");
+//        while(1)
+//        {
+//            ;
+//        }
+//    }
+//
+//    retc = sl_Start(0, 0, 0);
+//    if(retc < 0)
+//    {
+//        /*Handle Error */
+//        UART_PRINT("\n sl_Start failed\n");
+//        while(1)
+//        {
+//            ;
+//        }
+//    }
+//
+//    /*Output device information to the UART terminal */
+//    retc = DisplayAppBanner(APPLICATION_NAME, APPLICATION_VERSION);
+//    /*Set the ClientId with its own mac address */
+//    retc |= SetClientIdNamefromMacAddress();
+//
+//
+//    retc = sl_Stop(SL_STOP_TIMEOUT);
+//    if(retc < 0)
+//    {
+//        /*Handle Error */
+//        UART_PRINT("\n sl_Stop failed\n");
+//        while(1)
+//        {
+//            ;
+//        }
+//    }
+//
+//    if(retc < 0)
+//    {
+//        /*Handle Error */
+//        UART_PRINT("mqtt_client - Unable to retrieve device information \n");
+//        while(1)
+//        {
+//            ;
+//        }
+//    }
+//
+//    while(1)
+//    {
+//        gResetApplication = false;
+//        topic[0] = SUBSCRIPTION_TOPIC0;
+//        topic[1] = SUBSCRIPTION_TOPIC1;
+//        topic[2] = SUBSCRIPTION_TOPIC2;
+//        topic[3] = SUBSCRIPTION_TOPIC3;
+//        gInitState = 0;
+//
+//        /*Connect to AP                                                      */
+//        gApConnectionState = Mqtt_IF_Connect();
+//
+//        gInitState |= MQTT_INIT_STATE;
+//        /*Run MQTT Main Thread (it will open the Client and Server)          */
+//        Mqtt_start();
+//
+//        /*Wait for init to be completed!!!                                   */
+//        while(gInitState != 0)
+//        {
+//            UART_PRINT(".");
+//            sleep(1);
+//        }
+//        UART_PRINT(".\r\n");
+//
+//        while(gResetApplication == false)
+//        {
+//            ;
+//        }
+//
+//        UART_PRINT("TO Complete - Closing all threads and resources\r\n");
+//
+//        /*Stop the MQTT Process                                              */
+//        Mqtt_Stop();
+//
+//        UART_PRINT("reopen MQTT # %d  \r\n", ++count);
+//    }
+//}
 
 //*****************************************************************************
 //
