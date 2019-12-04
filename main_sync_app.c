@@ -36,15 +36,18 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <unistd.h>
+#include <pthread.h>
 #include <math.h>
 
 /* Driver Header files */
 #include <ti/drivers/GPIO.h>
 #include <ti/drivers/I2C.h>
 #include <ti/display/Display.h>
+#include <ti/drivers/SPI.h>
 
 /* Driver configuration */
 #include "ti_drivers_config.h"
+#include "uart_term.h"
 
 #define TASKSTACKSIZE       640
 
@@ -58,7 +61,7 @@
 #define ACC_1G           64;     /* 1g value */
 
 
-static Display_Handle display;
+extern void *mqttMain();
 
 /*
  *  ======== mainThread ========
@@ -73,20 +76,24 @@ void *mainThread(void *arg0)
     I2C_Handle      i2c;
     I2C_Params      i2cParams;
     I2C_Transaction i2cTransaction;
+    UART_Handle tUartHndl;
+    pthread_t thread;
+    pthread_attr_t pAttrs;
+    struct sched_param priParam;
+    int retc;
+    int detachState;
 
-    /* Call driver init functions */
-    Display_init();
+    /*----------------------Call driver init functions----------------------*/
     GPIO_init();
+    SPI_init();
     I2C_init();
 
-    /* Open the HOST display for output */
-    display = Display_open(Display_Type_UART, NULL);
-    if (display == NULL) {
-        while (1);
-    }
+    /*----------------------Configure the UART----------------------*/
+    tUartHndl = InitTerm();
+    /*remove uart receive from LPDS dependency                               */
+    UART_control(tUartHndl, UART_CMD_RXDISABLE, NULL);
 
-    /* Turn on user LED */
-    Display_printf(display, 0, 0, "Starting main_sync_app\n");
+    UART_PRINT("Starting main_sync_app\n\r");
 
     /*----------------------I2C and sensor initialization----------------------*/
     /* Create I2C for usage */
@@ -94,10 +101,10 @@ void *mainThread(void *arg0)
     i2cParams.bitRate = I2C_400kHz;
     i2c = I2C_open(0, &i2cParams);
     if (i2c == NULL) {
-        Display_printf(display, 0, 0, "Error Initializing I2C\n");
+        UART_PRINT("Error Initializing I2C\n\r");
         while (1);
     }
-    Display_printf(display, 0, 0, "I2C Initialized!\n");
+    UART_PRINT("I2C Initialized!\n\r");
 
     /*I2C transaction setup */
     i2cTransaction.writeBuf   = txBuffer;
@@ -110,11 +117,34 @@ void *mainThread(void *arg0)
     i2cTransaction.slaveAddress = ACC_ADDR;
     if (!I2C_transfer(i2c, &i2cTransaction)) {
         /* Could not resolve a sensor, error */
-        Display_printf(display, 0, 0, "Error when testing sensor.");
+        UART_PRINT("Error when testing sensor.\n\r");
         while(1);
     }
 
-    Display_printf(display, 0, 0, "Detected sensor.");
+    UART_PRINT("Detected sensor.\n\r");
+
+
+    /*----------------------Mqtt main thread creating----------------------*/
+    pthread_attr_init(&pAttrs);
+    priParam.sched_priority = 1;    //Set thread priority
+    detachState = PTHREAD_CREATE_DETACHED;
+    retc = pthread_attr_setdetachstate(&pAttrs, detachState);
+    if(retc != 0)
+    {
+        UART_PRINT("main_sync_app: MQTT main thread create fail (detach state)\n\r");
+        return(NULL);
+    }
+
+    retc |= pthread_attr_setschedparam(&pAttrs, &priParam); //Assign schedule parameters
+    retc |= pthread_attr_setstacksize(&pAttrs, 4096);       //Set the amount of stack memory to allocate
+    if(retc != 0)
+    {
+        UART_PRINT("main_sync_app: MQTT main thread create fail (schedule param or stack size)\n\r");
+        return(NULL);
+    }
+
+    retc = pthread_create(&thread, &pAttrs, mqttMain, NULL);    //Create the thread with all previous parameters
+
 
     /*----------------------Read sensor----------------------*/
     /* Take 40 samples and print them out onto the console */
@@ -125,7 +155,7 @@ void *mainThread(void *arg0)
             acc_x=rxBuffer[0];
         }
         else {
-            Display_printf(display, 0, 0, "I2C Bus fault.");
+            UART_PRINT("I2C Bus fault.\n\r");
         }
 
         /* y axis reading */
@@ -134,7 +164,7 @@ void *mainThread(void *arg0)
             acc_y=rxBuffer[0];
         }
         else {
-            Display_printf(display, 0, 0, "I2C Bus fault.");
+            UART_PRINT("I2C Bus fault.\n\r");
         }
 
         /* z axis reading */
@@ -143,7 +173,7 @@ void *mainThread(void *arg0)
             acc_z=rxBuffer[0];
         }
         else {
-            Display_printf(display, 0, 0, "I2C Bus fault.");
+            UART_PRINT("I2C Bus fault.\n\r");
         }
 
         /* Theta angle compute */
@@ -152,9 +182,9 @@ void *mainThread(void *arg0)
         if(acc_y<0) angleRad=-angleRad;     //Compute direction according to y-axis orientation
         angleDeg=angleRad*180/M_PI;         //compute angle in degrees
 
-        Display_printf(display, 0, 0, "Sample %u: z=%d ; scaled=%.2f g ; angle=%.2f rad ; angle=%.2f deg",
+        UART_PRINT("Sample %u: z=%d ; scaled=%.2f g ; angle=%.2f rad ; angle=%.2f deg\n\r",
                         sample, acc_z, acc_z_scaled, angleRad, angleDeg);
-        //Display_printf(display, 0, 0, "Sample %u: x=%d ; y=%d ; z=%d ; angle=%.2f deg",
+        //UART_PRINT("Sample %u: x=%d ; y=%d ; z=%d ; angle=%.2f deg",
         //                sample, acc_x, acc_y, acc_z, angle);
 
         /* Sleep for 1 second */
@@ -163,7 +193,7 @@ void *mainThread(void *arg0)
 
     /*----------------------Task end, clean up----------------------*/
     I2C_close(i2c);
-    Display_printf(display, 0, 0, "I2C closed!");
+    UART_PRINT("I2C closed!\n\r");
 
     return (NULL);
 }
