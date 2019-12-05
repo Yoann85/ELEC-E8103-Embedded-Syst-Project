@@ -82,8 +82,10 @@
 //#define SERVER_ADDRESS           "messagesight.demos.ibm.com"
 //#define SERVER_ADDRESS           "m2m.eclipse.org"
 //#define SERVER_IP_ADDRESS        "192.41.30.254"
-#define SERVER_ADDRESS           "test.mosquitto.org"
-#define SERVER_IP_ADDRESS        "5.196.95.208"
+//#define SERVER_ADDRESS           "test.mosquitto.org"
+//#define SERVER_IP_ADDRESS        "5.196.95.208"
+#define SERVER_ADDRESS           "broker.hivemq.com"
+#define SERVER_IP_ADDRESS        "3.124.223.186"
 #define PORT_NUMBER              1883
 #define SECURED_PORT_NUMBER      8883
 #define LOOPBACK_PORT            1882

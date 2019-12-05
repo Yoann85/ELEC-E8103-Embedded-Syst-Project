@@ -57,8 +57,8 @@
 #define ACC_REG_X        0x0003  /* Acceleration on x-axis */
 #define ACC_REG_Y        0x0005  /* Acceleration on y-axis */
 #define ACC_REG_Z        0x0007  /* Acceleration on z-axis */
-#define ACC_ADDR         0x18;   /* I2C Salve address of Acceleration sensor BMA222 */
-#define ACC_1G           64;     /* 1g value */
+#define ACC_ADDR         0x18    /* I2C Salve address of Acceleration sensor BMA222 */
+#define ACC_1G           64      /* 1g value */
 
 
 extern void *mqttMain();
@@ -70,7 +70,7 @@ void *mainThread(void *arg0)
 {
     uint16_t        sample;
     int8_t          acc_x, acc_y, acc_z;
-    double          acc_z_scaled, angleRad, angleDeg;
+    double          angle_X_Deg, angle_Y_Deg, angle_Z_Deg;
     uint8_t         txBuffer[1];
     uint8_t         rxBuffer[1];
     I2C_Handle      i2c;
@@ -143,12 +143,12 @@ void *mainThread(void *arg0)
         return(NULL);
     }
 
-    retc = pthread_create(&thread, &pAttrs, mqttMain, NULL);    //Create the thread with all previous parameters
+    //retc = pthread_create(&thread, &pAttrs, mqttMain, NULL);    //Create the thread with all previous parameters
 
 
     /*----------------------Read sensor----------------------*/
     /* Take 40 samples and print them out onto the console */
-    for (sample = 0; sample < 40; sample++) {
+    for (;;/*sample = 0; sample < 40; sample++*/) {
         /* x axis reading */
         txBuffer[0] = ACC_REG_X;
         if (I2C_transfer(i2c, &i2cTransaction)) {
@@ -176,16 +176,39 @@ void *mainThread(void *arg0)
             UART_PRINT("I2C Bus fault.\n\r");
         }
 
-        /* Theta angle compute */
-        acc_z_scaled=(double)acc_z/ACC_1G;  //scaling according to 1g's value
-        angleRad=acos(acc_z_scaled);        //compute angle in radians
-        if(acc_y<0) angleRad=-angleRad;     //Compute direction according to y-axis orientation
-        angleDeg=angleRad*180/M_PI;         //compute angle in degrees
+        /* Saturation of acceleration */
+        if(acc_x>ACC_1G){
+            acc_x=ACC_1G;
+        }
+        else if(acc_x<-ACC_1G){
+            acc_x=-ACC_1G;
+        }
 
-        UART_PRINT("Sample %u: z=%d ; scaled=%.2f g ; angle=%.2f rad ; angle=%.2f deg\n\r",
-                        sample, acc_z, acc_z_scaled, angleRad, angleDeg);
-        //UART_PRINT("Sample %u: x=%d ; y=%d ; z=%d ; angle=%.2f deg",
-        //                sample, acc_x, acc_y, acc_z, angle);
+        if(acc_y>ACC_1G){
+            acc_y=ACC_1G;
+        }
+        else if(acc_y<-ACC_1G){
+            acc_y=-ACC_1G;
+        }
+
+        if(acc_z>ACC_1G){
+            acc_z=ACC_1G;
+        }
+        else if(acc_z<-ACC_1G){
+            acc_z=-ACC_1G;
+        }
+
+        /* Angles compute */
+        angle_X_Deg=atan((double)acc_x/(sqrt(pow(acc_y,2)+pow(acc_z,2))))*180/M_PI; //x angle
+        angle_Y_Deg=atan((double)acc_y/(sqrt(pow(acc_x,2)+pow(acc_z,2))))*180/M_PI; //y angle
+        angle_Z_Deg=atan((double)acc_z/(sqrt(pow(acc_x,2)+pow(acc_y,2))))*180/M_PI; //y angle
+
+        //acceleration print
+        //UART_PRINT("Sample %u: x=%d ; y=%d ; z=%d\n\r",
+                        //sample, acc_x, acc_y, acc_z);
+        //angle print
+        UART_PRINT("Sample %u: x angle=%.2f deg ; y angle=%.2f deg ; z angle=%.2f deg\n\r",
+                                sample, angle_X_Deg, angle_Y_Deg, angle_Z_Deg);
 
         /* Sleep for 1 second */
         sleep(1);
