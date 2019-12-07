@@ -1,38 +1,3 @@
-/*
- * Copyright (c) 2018-2019, Texas Instruments Incorporated
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * *  Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *
- * *  Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *
- * *  Neither the name of Texas Instruments Incorporated nor the names of
- *    its contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
-/*
- *  ======== i2ctmp116.c ========
- */
 #include <stdint.h>
 #include <stddef.h>
 #include <unistd.h>
@@ -62,6 +27,8 @@
 
 
 extern void *mqttMain();
+void angleDeg(double accX, double accY, double accZ, double* angleX, double* angleY, double* angleZ);
+void angleSatur(int8_t* accX, int8_t* accY, int8_t* accZ, int8_t AbsoluteMaxVal);
 
 /*
  *  ======== mainThread ========
@@ -113,14 +80,14 @@ void *mainThread(void *arg0)
     i2cTransaction.readCount  = 1;  //1 axis' data is over 1 byte
 
     /*Test to get x-axis data*/
-    txBuffer[0] = ACC_REG_X;
-    i2cTransaction.slaveAddress = ACC_ADDR;
+
+    txBuffer[0] = ACC_REG_X;    //The register we want to read
+    i2cTransaction.slaveAddress = ACC_ADDR; //The sensors I2C address
     if (!I2C_transfer(i2c, &i2cTransaction)) {
         /* Could not resolve a sensor, error */
         UART_PRINT("Error when testing sensor.\n\r");
         while(1);
     }
-
     UART_PRINT("Detected sensor.\n\r");
 
 
@@ -132,7 +99,7 @@ void *mainThread(void *arg0)
     if(retc != 0)
     {
         UART_PRINT("main_sync_app: MQTT main thread create fail (detach state)\n\r");
-        return(NULL);
+        while(1);
     }
 
     retc |= pthread_attr_setschedparam(&pAttrs, &priParam); //Assign schedule parameters
@@ -140,7 +107,7 @@ void *mainThread(void *arg0)
     if(retc != 0)
     {
         UART_PRINT("main_sync_app: MQTT main thread create fail (schedule param or stack size)\n\r");
-        return(NULL);
+        while(1);
     }
 
     //retc = pthread_create(&thread, &pAttrs, mqttMain, NULL);    //Create the thread with all previous parameters
@@ -177,36 +144,15 @@ void *mainThread(void *arg0)
         }
 
         /* Saturation of acceleration */
-        if(acc_x>ACC_1G){
-            acc_x=ACC_1G;
-        }
-        else if(acc_x<-ACC_1G){
-            acc_x=-ACC_1G;
-        }
-
-        if(acc_y>ACC_1G){
-            acc_y=ACC_1G;
-        }
-        else if(acc_y<-ACC_1G){
-            acc_y=-ACC_1G;
-        }
-
-        if(acc_z>ACC_1G){
-            acc_z=ACC_1G;
-        }
-        else if(acc_z<-ACC_1G){
-            acc_z=-ACC_1G;
-        }
+        angleSatur(&acc_x, &acc_y, &acc_z, ACC_1G);
 
         /* Angles compute */
-        angle_X_Deg=atan((double)acc_x/(sqrt(pow(acc_y,2)+pow(acc_z,2))))*180/M_PI; //x angle
-        angle_Y_Deg=atan((double)acc_y/(sqrt(pow(acc_x,2)+pow(acc_z,2))))*180/M_PI; //y angle
-        angle_Z_Deg=atan((double)acc_z/(sqrt(pow(acc_x,2)+pow(acc_y,2))))*180/M_PI; //y angle
+        angleDeg((double)acc_x, (double)acc_y, (double)acc_z, &angle_X_Deg, &angle_Y_Deg, &angle_Z_Deg);
 
-        //acceleration print
+        //Raw accelerations print
         //UART_PRINT("Sample %u: x=%d ; y=%d ; z=%d\n\r",
                         //sample, acc_x, acc_y, acc_z);
-        //angle print
+        //Angle print
         UART_PRINT("Sample %u: x angle=%.2f deg ; y angle=%.2f deg ; z angle=%.2f deg\n\r",
                                 sample, angle_X_Deg, angle_Y_Deg, angle_Z_Deg);
 
@@ -219,6 +165,37 @@ void *mainThread(void *arg0)
     UART_PRINT("I2C closed!\n\r");
 
     return (NULL);
+}
+
+//Compute angles in degrees from accelerations
+void angleDeg(double accX, double accY, double accZ, double* angleX, double* angleY, double* angleZ){
+    *angleX=atan((double)accX/(sqrt(pow(accY,2)+pow(accZ,2))))*180/M_PI; //x angle
+    *angleY=atan((double)accY/(sqrt(pow(accX,2)+pow(accZ,2))))*180/M_PI; //y angle
+    *angleZ=atan((double)accZ/(sqrt(pow(accX,2)+pow(accY,2))))*180/M_PI; //z angle
+}
+
+//Saturate 3-axis accelerations while keeping the sign
+void angleSatur(int8_t* accX, int8_t* accY, int8_t* accZ, int8_t AbsoluteMaxVal){
+    if(*accX>AbsoluteMaxVal){
+        *accX=AbsoluteMaxVal;
+    }
+    else if(*accX<-AbsoluteMaxVal){
+        *accX=-AbsoluteMaxVal;
+    }
+
+    if(*accY>AbsoluteMaxVal){
+        *accY=AbsoluteMaxVal;
+    }
+    else if(*accY<-AbsoluteMaxVal){
+        *accY=-AbsoluteMaxVal;
+    }
+
+    if(*accZ>AbsoluteMaxVal){
+        *accZ=AbsoluteMaxVal;
+    }
+    else if(*accZ<-AbsoluteMaxVal){
+        *accZ=-AbsoluteMaxVal;
+    }
 }
 
 
