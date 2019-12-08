@@ -391,28 +391,4 @@ void angleDeg(double accX, double accY, double accZ, double* angleX, double* ang
     *angleZ=atan((double)accZ/(sqrt(pow(accX,2)+pow(accY,2))))*180/M_PI; //z angle
 }
 
-//Saturate 3-axis accelerations while keeping the sign
-void angleSatur(int8_t* accX, int8_t* accY, int8_t* accZ, int8_t AbsoluteMaxVal){
-    if(*accX>AbsoluteMaxVal){
-        *accX=AbsoluteMaxVal;
-    }
-    else if(*accX<-AbsoluteMaxVal){
-        *accX=-AbsoluteMaxVal;
-    }
-
-    if(*accY>AbsoluteMaxVal){
-        *accY=AbsoluteMaxVal;
-    }
-    else if(*accY<-AbsoluteMaxVal){
-        *accY=-AbsoluteMaxVal;
-    }
-
-    if(*accZ>AbsoluteMaxVal){
-        *accZ=AbsoluteMaxVal;
-    }
-    else if(*accZ<-AbsoluteMaxVal){
-        *accZ=-AbsoluteMaxVal;
-    }
-}
-
 
