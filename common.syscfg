@@ -1,39 +1,7 @@
-/*
- * Copyright (c) 2018-2019, Texas Instruments Incorporated
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * *  Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *
- * *  Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *
- * *  Neither the name of Texas Instruments Incorporated nor the names of
- *    its contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-// @cliArgs --board /ti/boards/CC3220SF_LAUNCHXL
-
-/*
- *  common.syscfg
- */
+// These arguments were used when this file was generated. They will be automatically applied on subsequent loads 
+// via the GUI or CLI invocations. Run CLI with '--help' for additional information on how to override these arguments.
+// @cliArgs --board "/ti/boards/CC3220SF_LAUNCHXL" --product "simplelink_cc32xx_sdk@3.30.01.02"
+// @versions {"data":"2019083011","timestamp":"2019083011","tool":"1.2.952","templates":"2019083011"}
 
 var SimpleLinkWifi = scripting.addModule("/ti/drivers/net/wifi/SimpleLinkWifi");
 var Crypto = scripting.addModule("/ti/drivers/Crypto");
@@ -61,6 +29,8 @@ var Timer2 = Timer.addInstance();
 var Timer3 = Timer.addInstance();
 var Watchdog = scripting.addModule("/ti/drivers/Watchdog");
 var Watchdog1 = Watchdog.addInstance();
+var I2C = scripting.addModule("/ti/drivers/I2C");
+var I2C1 = I2C.addInstance();
 // Name - The C/C++ identifier used in applications as the index parameter passed to Crypto runtime APIs
 Crypto1.$name = "CONFIG_Crypto_0";
 // IO Retention Shutdown - IO groups to be retained during Shutdown
@@ -100,23 +70,27 @@ GPIO2.$name = "CONFIG_GPIO_BUTTON_1";
 // Assign pin
 GPIO2.gpioPin.$assign = "boosterpack.11"; // P15
 // Use Hardware - Select the hardware to use, or 'None' to use available header pins
-GPIO3.$hardware = system.deviceData.board.components.LED0;
+GPIO3.$hardware = system.deviceData.board.components.LED_RED;
 // Output Strength - Specifies the output strength
 GPIO3.outputStrength = "High";
 // Name - The C/C++ identifier used in applications as the index parameter passed to GPIO runtime APIs
 GPIO3.$name = "CONFIG_GPIO_LED_0";
 // Use Hardware - Select the hardware to use, or 'None' to use available header pins
-GPIO4.$hardware = system.deviceData.board.components.LED2;
+GPIO4.$hardware = system.deviceData.board.components.LED_YELLOW;
 // Output Strength - Specifies the output strength
 GPIO4.outputStrength = "High";
 // Name - The C/C++ identifier used in applications as the index parameter passed to GPIO runtime APIs
 GPIO4.$name = "CONFIG_GPIO_LED_1";
+// Assign pin (ignoring conflicts)
+GPIO4.gpioPin.$assignAllowConflicts = "boosterpack.9"; // P01
 // Use Hardware - Select the hardware to use, or 'None' to use available header pins
-GPIO5.$hardware = system.deviceData.board.components.LED1;
+GPIO5.$hardware = system.deviceData.board.components.LED_GREEN;
 // Output Strength - Specifies the output strength
 GPIO5.outputStrength = "High";
 // Name - The C/C++ identifier used in applications as the index parameter passed to GPIO runtime APIs
 GPIO5.$name = "CONFIG_GPIO_LED_2";
+// Assign pin (ignoring conflicts)
+GPIO5.gpioPin.$assignAllowConflicts = "boosterpack.10"; // P02
 // Name - The C/C++ identifier used in applications as the index parameter passed to GPIO runtime APIs
 GPIO6.$name = "CONFIG_GPIO_0";
 // Mode - Select the GPIO mode
@@ -183,9 +157,19 @@ Watchdog1.$name = "CONFIG_WATCHDOG_0";
 Watchdog1.watchdog.$name = "MyWATCHDOG1";
 // Use Peripheral
 Watchdog1.watchdog.$assign = "WATCHDOG0";
+// Name - The C/C++ identifier used in applications as the index parameter passed to I2C runtime APIs
+I2C1.$name = "CONFIG_I2C_0";
+// Use Hardware - Select the hardware to use, or 'None' to use available header pins
+I2C1.$hardware = system.deviceData.board.components.LP_I2C;
+// Address Checks - How to handle detected peripheral address conflicts
+I2C1.addressChecks = "Warn";
+// Name
+I2C1.i2c.$name = "MyI2C1";
+// Assign pin (ignoring conflicts)
+I2C1.i2c.sdaPin.$assignAllowConflicts = "boosterpack.10"; // P02
+// Assign pin (ignoring conflicts)
+I2C1.i2c.sclPin.$assignAllowConflicts = "boosterpack.9"; // P01
 // Suggest solution
 GPIO3.gpioPin.$suggestSolution = "64";
 // Suggest solution
-GPIO4.gpioPin.$suggestSolution = "1";
-// Suggest solution
-GPIO5.gpioPin.$suggestSolution = "2";
+I2C1.i2c.$suggestSolution = "I2C0";

@@ -51,7 +51,7 @@
 //*****************************************************************************
 
 #include "mqtt_client.h"    //Mqtt client header
-
+#include "mailboxConf.h"
 //*****************************************************************************
 //                          LOCAL DEFINES
 //*****************************************************************************
@@ -156,6 +156,7 @@ int32_t Mqtt_IF_Connect();
 int32_t MqttServer_start();
 int32_t MqttClient_start();
 int32_t MQTT_SendMsgToQueue(struct msgQueue *queueElement);
+//extern char sharedBuff[30];
 
 //*****************************************************************************
 //                 GLOBAL VARIABLES
@@ -554,6 +555,17 @@ void * MqttClient(void *pvParameters)
         /*subscribed by local client)                                */
         case MSG_RECV_BY_CLIENT:
             tmpBuff = (char *) ((char *) queueElemRecv.msgPtr + 12);
+            //UART_PRINT("tmpBuff = %s", tmpBuff);
+
+            MsgObj msg;
+            Int i = 5;
+            msg.id = i;
+            strncpy(msg.message, "client Thread msg", 30);
+            if (Mailbox_post(mbxHandle, &msg, BIOS_NO_WAIT))
+            {
+                // Print commented out to prevent printing from 2 different thread (messy)
+                //UART_PRINT("Mailbox Write from client thread: ID = %d and Value = '%s'.\n",msg.id, msg.val);
+            }
             if(strncmp
                 (tmpBuff, SUBSCRIPTION_TOPIC1, queueElemRecv.topLen) == 0)
             {
