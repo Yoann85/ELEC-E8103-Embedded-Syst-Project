@@ -42,6 +42,7 @@
 /* Kernel (Non OS/Free-RTOS/TI-RTOS) includes                                */
 #include "pthread.h"
 #include "mqueue.h"
+#include "mailboxConf.h"
 
 /* Common interface includes                                                 */
 #include "uart_term.h"
@@ -225,6 +226,17 @@ void MqttClientCallback(int32_t event,
         queueElem.event = MSG_RECV_BY_CLIENT;
         queueElem.msgPtr = pubBuff;
         queueElem.topLen = recvMetaData->topLen;
+
+        MsgObj msg;
+        Int i = 5;
+        msg.id = i;
+
+
+        strncpy(msg.message, data, dataLen);
+        if (Mailbox_post(mbxHandle, &msg, BIOS_NO_WAIT))
+        {
+            //UART_PRINT("Mailbox Write from client thread: ID = %d and Value = '%s'.\n",msg.id, msg.val);
+        }
 
         /* signal to the main task                                        */
         if(MQTT_SendMsgToQueue(&queueElem))

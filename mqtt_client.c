@@ -51,7 +51,6 @@
 //*****************************************************************************
 
 #include "mqtt_client.h"    //Mqtt client header
-#include "mailboxConf.h"
 //*****************************************************************************
 //                          LOCAL DEFINES
 //*****************************************************************************
@@ -84,7 +83,7 @@
 //#define SERVER_IP_ADDRESS        "192.41.30.254"
 //#define SERVER_ADDRESS           "test.mosquitto.org"
 //#define SERVER_IP_ADDRESS        "5.196.95.208"
-#define SERVER_ADDRESS           "broker.hivemq.com"
+#define SERVER_ADDRESS           "test.mosquitto.org"
 #define SERVER_IP_ADDRESS        "3.124.223.186"
 #define PORT_NUMBER              1883
 #define SECURED_PORT_NUMBER      8883
@@ -94,10 +93,9 @@
 #define CLEAN_SESSION            true
 
 /* Retain Flag. Used in publish message.                                     */
-#define RETAIN_ENABLE            1
+
 
 /* Defining Number of subscription topics                                    */
-#define SUBSCRIPTION_TOPIC_COUNT 4
 
 /* Defining Subscription Topic Values                                        */
 #define SUBSCRIPTION_TOPIC0      "/Broker/To/cc32xx"
@@ -167,8 +165,6 @@ int32_t gApConnectionState = -1;
 uint32_t gInitState = 0;
 uint32_t memPtrCounterfree = 0;
 bool gResetApplication = false;
-static MQTTClient_Handle gMqttClient;
-MQTTClient_Params MqttClientExmple_params;
 unsigned short g_usTimerInts;
 
 /* Receive task handle                                                       */
@@ -191,10 +187,7 @@ const char *ClientPassword = "pwd1";
 char *topic[SUBSCRIPTION_TOPIC_COUNT] =
 { SUBSCRIPTION_TOPIC0, SUBSCRIPTION_TOPIC1, \
     SUBSCRIPTION_TOPIC2, SUBSCRIPTION_TOPIC3 };
-
-unsigned char qos[SUBSCRIPTION_TOPIC_COUNT] =
-{ MQTT_QOS_2, MQTT_QOS_2, MQTT_QOS_2, MQTT_QOS_2 };
-
+unsigned char qos[SUBSCRIPTION_TOPIC_COUNT] = { MQTT_QOS_2, MQTT_QOS_2, MQTT_QOS_2, MQTT_QOS_2 };
 /* Publishing topics and messages                                            */
 const char *publish_topic = { PUBLISH_TOPIC0 };
 const char *publish_data = { PUBLISH_TOPIC0_DATA };
@@ -556,16 +549,17 @@ void * MqttClient(void *pvParameters)
         case MSG_RECV_BY_CLIENT:
             tmpBuff = (char *) ((char *) queueElemRecv.msgPtr + 12);
             //UART_PRINT("tmpBuff = %s", tmpBuff);
-
+            /*
             MsgObj msg;
             Int i = 5;
             msg.id = i;
-            strncpy(msg.message, "client Thread msg", 30);
+            strncpy(msg.message, tmpBuff, 30);
             if (Mailbox_post(mbxHandle, &msg, BIOS_NO_WAIT))
             {
                 // Print commented out to prevent printing from 2 different thread (messy)
                 //UART_PRINT("Mailbox Write from client thread: ID = %d and Value = '%s'.\n",msg.id, msg.val);
             }
+            */
             if(strncmp
                 (tmpBuff, SUBSCRIPTION_TOPIC1, queueElemRecv.topLen) == 0)
             {
@@ -817,6 +811,7 @@ int32_t MqttClient_start()
     /*Initialize MQTT client lib                                             */
     gMqttClient = MQTTClient_create(MqttClientCallback,
                                     &MqttClientExmple_params);
+    UART_PRINT("HANDLE: %s", gMqttClient);
     if(gMqttClient == NULL)
     {
         /*lib initialization failed                                          */

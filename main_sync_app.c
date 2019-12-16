@@ -20,6 +20,7 @@
 #include "uart_term.h"
 #include "mailboxConf.h"
 #include "main_sync_app.h"
+#include <ti/net/mqtt/mqttclient.h>
 /*
  *  ======== Accelerometer BMA222 Registers ========
  */
@@ -31,7 +32,6 @@
 
 
 extern void *mqttMain();
-
 MailboxMsgObj mailboxBuffer[NUMMSGS];
 Mailbox_Handle mbxHandle;
 Mailbox_Params mbxParams;
@@ -39,11 +39,7 @@ Mailbox_Params mbxParams;
 /*
  *  ======== mainThread ========
  */
-
-// global variable for shared buffer
-//char sharedBuff[30] = {NULL};
-
-
+#define REFBOARD false
 void *mainThread(void *arg0)
 {
     uint8_t         txBuffer[1];
@@ -119,19 +115,45 @@ void *mainThread(void *arg0)
         while(1);
     }
     retc = pthread_create(&thread, &pAttrs, mqttMain, NULL);    //Create the thread with all previous parameters
+    const char *publish_topic = { PUBLISH_TOPIC1 };
 
 
     /*----------------------Mailbox configuration----------------------*/
-
     Mailbox_Params_init(&mbxParams);
     mbxParams.buf = (Ptr)mailboxBuffer;
     mbxParams.bufSize = sizeof(mailboxBuffer);
     Mailbox_construct(&mbxStruct, sizeof(MsgObj), NUMMSGS, &mbxParams, NULL);
     mbxHandle = Mailbox_handle(&mbxStruct);
 
-    // receive reference board rotation
-    // thread execution will be waiting untill message is received
-    // Main logic loop
+    // Main logic loops for both boards
+#if REFBOARD == true // If we build for reference board
+    while(1)
+    {
+        /*----------------------Read sensor----------------------*/
+        /* Take 40 samples and print them out onto the console */
+        double * rotation;
+        rotation = getCurrentAngles(txBuffer, i2c, i2cTransaction, rxBuffer);
+
+        // payload = message from client thread with reference rotation (received from mailbox)
+        while(gMqttClient == NULL)
+        {
+            sleep(3);
+        }
+        char publish_data[30];
+        sprintf(publish_data, "%.2lf,%.2lf,%.2lf", rotation[0], rotation[1], rotation[2]);
+        MQTTClient_publish(gMqttClient, (char*) publish_topic, strlen(
+                                              (char*)publish_topic),
+                                          (char*)publish_data,
+                                          strlen((char*) publish_data), MQTT_QOS_2 |
+                                          ((RETAIN_ENABLE) ? MQTT_PUBLISH_RETAIN : 0));
+
+                    UART_PRINT("\n\r CC3200 Publishes the following message \n\r");
+                    UART_PRINT("Topic: %s\n\r", publish_topic);
+                    UART_PRINT("Data: %s\n\r", publish_data);
+
+        sleep(5);
+    }
+#else  // if we build for the syncing board
     while(1)
     {
         MsgObj msg;
@@ -148,11 +170,15 @@ void *mainThread(void *arg0)
         rotation = getCurrentAngles(txBuffer, i2c, i2cTransaction, rxBuffer);
 
         // payload = message from client thread with reference rotation (received from mailbox)
-        char payload[50] = "160.00,160.00,160.00";
+        while(gMqttClient == NULL)
+        {
+            sleep(3);
+        }
         int maxdif = 180;
-        calculateAndDrawSyncronization(payload,rotation,maxdif);
-        sleep(1);
+        calculateAndDrawSyncronization(receivedMsg,rotation,maxdif);
+        sleep(5);
     }
+    #endif
     /*----------------------Task end, clean up----------------------*/
     I2C_close(i2c);
     UART_PRINT("I2C closed!\n\r");
@@ -179,7 +205,6 @@ void *mainThread(void *arg0)
 //! \return None
 //!
 //*****************************************************************************
-
 void calculateAndDrawSyncronization (char payload[], double * currRot, int maxdif)
 {
     double xval, yval, zval, xdif, ydif, zdif, tdif;
@@ -223,7 +248,7 @@ void calculateAndDrawSyncronization (char payload[], double * currRot, int maxdi
     ydif = round((1 - (ydif / maxdif)) * 100 );
     zdif = round((1 - (zdif / maxdif)) * 100 );
     /* Total difference percentage */
-    tdif = xdif + ydif + zdif;
+    tdif = (xdif + ydif + zdif) / 3;
     /* Get bars */
     p = drawSyncBar(xdif);
     strcpy(barx, p);
@@ -256,6 +281,14 @@ void calculateAndDrawSyncronization (char payload[], double * currRot, int maxdi
             UART_PRINT("t sync:");
             UART_PRINT(bart);
             UART_PRINT("\n\r");
+            if(tdif >= 95.00)
+            {
+                GPIO_write(CONFIG_GPIO_LED_0, CONFIG_GPIO_LED_ON);
+            }
+            else
+            {
+                GPIO_write(CONFIG_GPIO_LED_0, CONFIG_GPIO_LED_OFF);
+            }
             break;
         default:
             /* For the infinites and other weirdness */
@@ -345,10 +378,10 @@ double * getCurrentAngles(uint8_t txBuffer[1], I2C_Handle i2c, I2C_Transaction i
         //UART_PRINT("Sample %u: x=%d ; y=%d ; z=%d\n\r",
         //sample, acc_x, acc_y, acc_z);
         //angle print
-        UART_PRINT(
+        /*UART_PRINT(
                 "Sample %u: x angle=%.2f deg ; y angle=%.2f deg ; z angle=%.2f deg\n\r",
                 sample, angle_X_Deg, angle_Y_Deg, angle_Z_Deg);
-
+        */
         // TODO: clean this
         static double result[3];
         result[0]=angle_X_Deg;
