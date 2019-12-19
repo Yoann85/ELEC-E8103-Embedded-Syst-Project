@@ -20,7 +20,7 @@
 #include "uart_term.h"
 #include "mailboxConf.h"
 #include "main_sync_app.h"
-#include <ti/net/mqtt/mqttclient.h>
+#include "mqtt_client.h"
 /*
  *  ======== Accelerometer BMA222 Registers ========
  */
@@ -151,14 +151,13 @@ void *mainThread(void *arg0)
                     UART_PRINT("Topic: %s\n\r", publish_topic);
                     UART_PRINT("Data: %s\n\r", publish_data);
 
-        sleep(5);
+        sleep(1);
     }
 #else  // if we build for the syncing board
     while(1)
     {
         MsgObj msg;
         char receivedMsg[30];
-
         // currently this is run just 1 time since we are sending just init msg from ref board. If you want to test just comment 3 lines below
         Mailbox_pend(mbxHandle, &msg, BIOS_WAIT_FOREVER);
         strncpy(receivedMsg, msg.message, 30);
@@ -168,7 +167,7 @@ void *mainThread(void *arg0)
         /* Take 40 samples and print them out onto the console */
         double * rotation;
         rotation = getCurrentAngles(txBuffer, i2c, i2cTransaction, rxBuffer);
-
+        Task_sleep(500);
         // payload = message from client thread with reference rotation (received from mailbox)
         while(gMqttClient == NULL)
         {
@@ -176,7 +175,6 @@ void *mainThread(void *arg0)
         }
         int maxdif = 180;
         calculateAndDrawSyncronization(receivedMsg,rotation,maxdif);
-        sleep(5);
     }
     #endif
     /*----------------------Task end, clean up----------------------*/
@@ -269,6 +267,7 @@ void calculateAndDrawSyncronization (char payload[], double * currRot, int maxdi
         switch(isfin)
         {
         case 1:
+            UART_PRINT("\n\r");
             UART_PRINT("X sync:");
             UART_PRINT(barx);
             UART_PRINT("\n\r");
@@ -421,7 +420,7 @@ void angleSatur(int8_t* accX, int8_t* accY, int8_t* accZ, int8_t AbsoluteMaxVal)
 void angleDeg(double accX, double accY, double accZ, double* angleX, double* angleY, double* angleZ){
     *angleX=atan((double)accX/(sqrt(pow(accY,2)+pow(accZ,2))))*180/M_PI; //x angle
     *angleY=atan((double)accY/(sqrt(pow(accX,2)+pow(accZ,2))))*180/M_PI; //y angle
-    *angleZ=atan((double)accZ/(sqrt(pow(accX,2)+pow(accY,2))))*180/M_PI; //z angle
+    *angleZ=atan((sqrt(pow(accX,2)+pow(accY,2)))/(double)accZ)*180/M_PI; //z angle
 }
 
 

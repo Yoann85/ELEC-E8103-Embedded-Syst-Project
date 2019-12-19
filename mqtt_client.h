@@ -38,5 +38,10 @@
 /* Application includes                                                      */
 #include "client_cbs.h"
 
+#define PUBLISH_TOPIC1           "/sync/measurements"
+#define SUBSCRIPTION_TOPIC_COUNT 4
+#define RETAIN_ENABLE            1
+volatile MQTTClient_Handle gMqttClient;
+MQTTClient_Params MqttClientExmple_params;
 
 #endif /* MQTT_CLIENT_H_ */

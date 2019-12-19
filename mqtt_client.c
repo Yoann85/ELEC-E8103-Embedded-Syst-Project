@@ -98,11 +98,10 @@
 /* Defining Number of subscription topics                                    */
 
 /* Defining Subscription Topic Values                                        */
-#define SUBSCRIPTION_TOPIC0      "/Broker/To/cc32xx"
+#define SUBSCRIPTION_TOPIC0      "/placeholder"//"/Broker/To/cc32xx"
 #define SUBSCRIPTION_TOPIC1      "/CC3220_Board2G6/ToggleLEDCmdL1"
 #define SUBSCRIPTION_TOPIC2      "/CC3220_Board2G6/ToggleLEDCmdL2"
-#define SUBSCRIPTION_TOPIC3      "/CC3220_Board2G6/ToggleLEDCmdL3"
-
+#define SUBSCRIPTION_TOPIC3      "/sync/measurements"
 /* Defining Publish Topic Values                                             */
 #define PUBLISH_TOPIC0           "/CC3220_Board2G6/ButtonPressEvtSw2"
 #define PUBLISH_TOPIC0_DATA \
