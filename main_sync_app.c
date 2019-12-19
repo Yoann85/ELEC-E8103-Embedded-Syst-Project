@@ -39,7 +39,7 @@ Mailbox_Params mbxParams;
 /*
  *  ======== mainThread ========
  */
-#define REFBOARD false
+#define REFBOARD true
 void *mainThread(void *arg0)
 {
     uint8_t         txBuffer[1];
@@ -63,6 +63,7 @@ void *mainThread(void *arg0)
     tUartHndl = InitTerm();
     /*remove uart receive from LPDS dependency                               */
     UART_control(tUartHndl, UART_CMD_RXDISABLE, NULL);
+    int sampling_count = 0;
 
     UART_PRINT("Starting main_sync_app\n\r");
 
@@ -96,6 +97,8 @@ void *mainThread(void *arg0)
     }
     UART_PRINT("Detected sensor.\n\r");
 
+    double averageArray[50*3] = {NULL};
+
     /*----------------------Mqtt main thread creating----------------------*/
     pthread_attr_init(&pAttrs);
     priParam.sched_priority = 1;    //Set thread priority
@@ -124,22 +127,23 @@ void *mainThread(void *arg0)
     mbxParams.bufSize = sizeof(mailboxBuffer);
     Mailbox_construct(&mbxStruct, sizeof(MsgObj), NUMMSGS, &mbxParams, NULL);
     mbxHandle = Mailbox_handle(&mbxStruct);
+    bool justBooted = true;
 
     // Main logic loops for both boards
-#if REFBOARD == true // If we build for reference board
+#if REFBOARD == false // If we build for reference board
     while(1)
     {
         /*----------------------Read sensor----------------------*/
         /* Take 40 samples and print them out onto the console */
         double * rotation;
         rotation = getCurrentAngles(txBuffer, i2c, i2cTransaction, rxBuffer);
-
+        //UART_PRINT("ROT: %lf, %lf, %lf \n\r", rotation[0], rotation[1], rotation[2]);
         // payload = message from client thread with reference rotation (received from mailbox)
         while(gMqttClient == NULL)
         {
             sleep(3);
         }
-        char publish_data[30];
+        /*char publish_data[30];
         sprintf(publish_data, "%.2lf,%.2lf,%.2lf", rotation[0], rotation[1], rotation[2]);
         MQTTClient_publish(gMqttClient, (char*) publish_topic, strlen(
                                               (char*)publish_topic),
@@ -150,8 +154,29 @@ void *mainThread(void *arg0)
                     UART_PRINT("\n\r CC3200 Publishes the following message \n\r");
                     UART_PRINT("Topic: %s\n\r", publish_topic);
                     UART_PRINT("Data: %s\n\r", publish_data);
+*/
+        if(sampling_count > 147)
+        {
+            double angleAverage = calculateAngleAvg(averageArray, 50);
+            UART_PRINT("angleAverage: %lf \n\r", angleAverage);
+            char publish_data[30];
+            sprintf(publish_data, "%.2lf", angleAverage);
+            MQTTClient_publish(gMqttClient, (char*) publish_topic, strlen(
+                                                          (char*)publish_topic),
+                                                      (char*)publish_data,
+                                                      strlen((char*) publish_data), MQTT_QOS_2 |
+                                                      ((RETAIN_ENABLE) ? MQTT_PUBLISH_RETAIN : 0));
 
-        sleep(1);
+                                //UART_PRINT("\n\r CC3200 Publishes the following message \n\r");
+                                //UART_PRINT("Topic: %s\n\r", publish_topic);
+                                //UART_PRINT("Data: %s\n\r", publish_data);
+           sampling_count = 0;
+        }
+        averageArray[sampling_count] = rotation[0];
+        averageArray[(sampling_count+1)] = rotation[1];
+        averageArray[(sampling_count+2)] = rotation[2];
+        sampling_count = sampling_count + 3;
+        Task_sleep(20);
     }
 #else  // if we build for the syncing board
     while(1)
@@ -159,22 +184,53 @@ void *mainThread(void *arg0)
         MsgObj msg;
         char receivedMsg[30];
         // currently this is run just 1 time since we are sending just init msg from ref board. If you want to test just comment 3 lines below
-        Mailbox_pend(mbxHandle, &msg, BIOS_WAIT_FOREVER);
-        strncpy(receivedMsg, msg.message, 30);
-        UART_PRINT("Mailbox Read from sync_app thread: ID = %d and message = '%s'.\n",msg.id, receivedMsg);
-
-        /*----------------------Read sensor----------------------*/
-        /* Take 40 samples and print them out onto the console */
-        double * rotation;
-        rotation = getCurrentAngles(txBuffer, i2c, i2cTransaction, rxBuffer);
-        Task_sleep(500);
-        // payload = message from client thread with reference rotation (received from mailbox)
-        while(gMqttClient == NULL)
+        int pendingMessages = 0;
+        pendingMessages = Mailbox_getNumPendingMsgs(mbxHandle);
+        UART_PRINT("Number of pending messages: %d", pendingMessages);
+        if(!justBooted)
         {
-            sleep(3);
+            //UART_PRINT("Mailbox Read from sync_app thread: ID = %d and message = '%s'.\n",msg.id, receivedMsg);
+
+           /*----------------------Read sensor----------------------*/
+           /* Take 40 samples and print them out onto the console */
+           double * rotation;
+           rotation = getCurrentAngles(txBuffer, i2c, i2cTransaction, rxBuffer);
+           Task_sleep(500);
+           // payload = message from client thread with reference rotation (received from mailbox)
+           while(gMqttClient == NULL)
+           {
+               sleep(3);
+           }
+           //int maxdif = 180;
+           //calculateAndDrawSyncronization(receivedMsg,rotation,maxdif);
+
+           // add measurements to array
+           if(sampling_count > 147)
+           {
+               sampling_count = 0;
+           }
+           averageArray[sampling_count] = rotation[0];
+           averageArray[(sampling_count+1)] = rotation[1];
+           averageArray[(sampling_count+2)] = rotation[2];
+           sampling_count = sampling_count + 3;
+           if(pendingMessages > 0 && averageArray[-1] != NULL)
+           {
+               Mailbox_pend(mbxHandle, &msg, BIOS_NO_WAIT);
+               strncpy(receivedMsg, msg.message, 30);
+
+               double * syncBoardAverages = {NULL};
+               syncBoardAverages = calculateAngleAvg(averageArray, 50);
+               double * refBoardAverages = {NULL};
+               refBoardAverages = ParseMessage(receivedMsg);
+               compareAngleSync(syncBoardAverages, refBoardAverages);
+           }
         }
-        int maxdif = 180;
-        calculateAndDrawSyncronization(receivedMsg,rotation,maxdif);
+        else
+        {
+            Mailbox_pend(mbxHandle, &msg, BIOS_NO_WAIT);
+            sleep(1);
+        }
+
     }
     #endif
     /*----------------------Task end, clean up----------------------*/
@@ -184,6 +240,73 @@ void *mainThread(void *arg0)
     /* Sleep for 1 second */
     return (NULL);
 }
+
+double * ParseMessage(char * refBoardMessage)
+{
+    double xval, yval, zval, totalVal;
+
+    char * messageString = strtok(refBoardMessage, ",");
+    xval = atof(messageString);
+    messageString = strtok(NULL, ",");
+    yval = atof(messageString);
+    messageString = strtok(NULL, ",");
+    zval = atof(messageString);
+    messageString = strtok(NULL, ",");
+    zval = atof(messageString);
+    messageString = strtok(NULL, ",");
+    totalVal = atof(messageString);
+
+    static double result[4];
+    result[0]=xval;
+    result[1]=yval;
+    result[2]=zval;
+    result[3]=totalVal;
+    return result;
+}
+
+double * calculateAngleAvg (double * own_values, int sample_cnt)
+{
+    int i;
+    double x_own = 0.0, y_own = 0.0, z_own = 0.0, x_avg = 0.0, y_avg = 0.0, z_avg = 0.0, own_sync= 0.0;
+    for (i=0; i<150; i = i+3)
+    {
+        if(isfinite(own_values[i]) != 0 && isfinite(own_values[i+1]) != 0 && isfinite(own_values[i+2] != 0))
+        {
+        x_own += own_values[i];
+        y_own += own_values[i+1];
+        z_own += own_values[i+2];
+        }
+        else //failsafe
+        {
+            x_own += 0;
+            y_own += 0;
+            z_own += 0;
+        }
+    }
+
+    x_avg = x_own / 50.0;
+    y_avg = y_own / 50.0;
+    z_avg = z_own / 50.0;
+
+    own_sync = x_avg + y_avg + z_avg;
+
+    static double result[4];
+    result[0]=x_avg;
+    result[1]=y_avg;
+    result[2]=z_avg;
+    result[3]=own_sync;
+
+    return result;
+}
+
+void compareAngleSync (double * own_value, double * ref_value)
+{
+    double difference = 0.0;
+    int i = 0;
+    UART_PRINT("Diff X: %.1lf,  Diff Y: %.1lf,   Diff Z: %.1lf",fabs(own_value[0] - ref_value[0]), fabs(own_value[1] - ref_value[1]),fabs(own_value[2] - ref_value[2]));
+    UART_PRINT("TOTAL DIFF: %.1lf", fabs(own_value[3] - ref_value[3]));
+}
+
 
 //*****************************************************************************
 //
@@ -368,7 +491,7 @@ double * getCurrentAngles(uint8_t txBuffer[1], I2C_Handle i2c, I2C_Transaction i
             UART_PRINT("I2C Bus fault.\n\r");
         }
         /* Saturation of acceleration */
-        angleSatur(&acc_x, &acc_y, &acc_z, ACC_1G);
+        //angleSatur(&acc_x, &acc_y, &acc_z, ACC_1G);
 
         /* Angles compute */
         angleDeg((double)acc_x, (double)acc_y, (double)acc_z, &angle_X_Deg, &angle_Y_Deg, &angle_Z_Deg);
@@ -418,9 +541,9 @@ void angleSatur(int8_t* accX, int8_t* accY, int8_t* accZ, int8_t AbsoluteMaxVal)
 
 //Compute angles in degrees from accelerations
 void angleDeg(double accX, double accY, double accZ, double* angleX, double* angleY, double* angleZ){
-    *angleX=atan((double)accX/(sqrt(pow(accY,2)+pow(accZ,2))))*180/M_PI; //x angle
-    *angleY=atan((double)accY/(sqrt(pow(accX,2)+pow(accZ,2))))*180/M_PI; //y angle
-    *angleZ=atan((sqrt(pow(accX,2)+pow(accY,2)))/(double)accZ)*180/M_PI; //z angle
+    *angleX=atan((double)accX/(sqrt(pow(accY,2)+pow(accZ,2.0))))*180.0/M_PI; //x angle
+    *angleY=atan((double)accY/(sqrt(pow(accX,2)+pow(accZ,2.0))))*180.0/M_PI; //y angle
+    *angleZ=atan((sqrt(pow(accX,2)+pow(accY,2.0)))/(double)accZ)*180.0/M_PI; //z angle
 }
 
 

@@ -44,4 +44,7 @@
 volatile MQTTClient_Handle gMqttClient;
 MQTTClient_Params MqttClientExmple_params;
 
+double * calculateAngleAvg (double *, int);
+double * ParseMessage(char * );
+
 #endif /* MQTT_CLIENT_H_ */
