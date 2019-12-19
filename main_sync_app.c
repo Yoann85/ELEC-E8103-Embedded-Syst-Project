@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <time.h>
 
 /* Driver Header files */
 #include <ti/drivers/GPIO.h>
@@ -39,7 +40,7 @@ Mailbox_Params mbxParams;
 /*
  *  ======== mainThread ========
  */
-#define REFBOARD true
+#define REFBOARD false
 void *mainThread(void *arg0)
 {
     uint8_t         txBuffer[1];
@@ -157,10 +158,10 @@ void *mainThread(void *arg0)
 */
         if(sampling_count > 147)
         {
-            double angleAverage = calculateAngleAvg(averageArray, 50);
-            UART_PRINT("angleAverage: %lf \n\r", angleAverage);
+            double * angleAverage = calculateAngleAvg(averageArray, 50);
+            UART_PRINT("%.2lf,%.2lf,%.2lf,%.2lf \n\r", angleAverage[0],angleAverage[1],angleAverage[2], angleAverage[3]);
             char publish_data[30];
-            sprintf(publish_data, "%.2lf", angleAverage);
+            sprintf(publish_data, "%.2lf,%.2lf,%.2lf,%.2lf", angleAverage[0],angleAverage[1],angleAverage[2], angleAverage[3]);
             MQTTClient_publish(gMqttClient, (char*) publish_topic, strlen(
                                                           (char*)publish_topic),
                                                       (char*)publish_data,
@@ -176,7 +177,7 @@ void *mainThread(void *arg0)
         averageArray[(sampling_count+1)] = rotation[1];
         averageArray[(sampling_count+2)] = rotation[2];
         sampling_count = sampling_count + 3;
-        Task_sleep(20);
+        Task_sleep(15);
     }
 #else  // if we build for the syncing board
     while(1)
@@ -187,15 +188,15 @@ void *mainThread(void *arg0)
         int pendingMessages = 0;
         pendingMessages = Mailbox_getNumPendingMsgs(mbxHandle);
         UART_PRINT("Number of pending messages: %d", pendingMessages);
-        if(!justBooted)
+        if(justBooted == false)
         {
+            Task_sleep(5);
             //UART_PRINT("Mailbox Read from sync_app thread: ID = %d and message = '%s'.\n",msg.id, receivedMsg);
 
            /*----------------------Read sensor----------------------*/
            /* Take 40 samples and print them out onto the console */
            double * rotation;
            rotation = getCurrentAngles(txBuffer, i2c, i2cTransaction, rxBuffer);
-           Task_sleep(500);
            // payload = message from client thread with reference rotation (received from mailbox)
            while(gMqttClient == NULL)
            {
@@ -217,7 +218,6 @@ void *mainThread(void *arg0)
            {
                Mailbox_pend(mbxHandle, &msg, BIOS_NO_WAIT);
                strncpy(receivedMsg, msg.message, 30);
-
                double * syncBoardAverages = {NULL};
                syncBoardAverages = calculateAngleAvg(averageArray, 50);
                double * refBoardAverages = {NULL};
@@ -228,9 +228,9 @@ void *mainThread(void *arg0)
         else
         {
             Mailbox_pend(mbxHandle, &msg, BIOS_NO_WAIT);
+            justBooted = false;
             sleep(1);
         }
-
     }
     #endif
     /*----------------------Task end, clean up----------------------*/
@@ -252,8 +252,6 @@ double * ParseMessage(char * refBoardMessage)
     messageString = strtok(NULL, ",");
     zval = atof(messageString);
     messageString = strtok(NULL, ",");
-    zval = atof(messageString);
-    messageString = strtok(NULL, ",");
     totalVal = atof(messageString);
 
     static double result[4];
@@ -270,7 +268,7 @@ double * calculateAngleAvg (double * own_values, int sample_cnt)
     double x_own = 0.0, y_own = 0.0, z_own = 0.0, x_avg = 0.0, y_avg = 0.0, z_avg = 0.0, own_sync= 0.0;
     for (i=0; i<150; i = i+3)
     {
-        if(isfinite(own_values[i]) != 0 && isfinite(own_values[i+1]) != 0 && isfinite(own_values[i+2] != 0))
+        if(isfinite(own_values[i]) != 0 && isfinite(own_values[i+1]) != 0 && isfinite(own_values[i+2]) != 0)
         {
         x_own += own_values[i];
         y_own += own_values[i+1];
@@ -301,10 +299,9 @@ double * calculateAngleAvg (double * own_values, int sample_cnt)
 
 void compareAngleSync (double * own_value, double * ref_value)
 {
-    double difference = 0.0;
-    int i = 0;
-    UART_PRINT("Diff X: %.1lf,  Diff Y: %.1lf,   Diff Z: %.1lf",fabs(own_value[0] - ref_value[0]), fabs(own_value[1] - ref_value[1]),fabs(own_value[2] - ref_value[2]));
-    UART_PRINT("TOTAL DIFF: %.1lf", fabs(own_value[3] - ref_value[3]));
+    UART_PRINT("%u Diff X: %.1lf,  Diff Y: %.1lf,   Diff Z: %.1lf \n\r",(unsigned long) time(NULL),fabs(own_value[0] - ref_value[0]), fabs(own_value[1] - ref_value[1]),fabs(own_value[2] - ref_value[2]));
+    UART_PRINT("%u TOTAL DIFF: %.1lf \n\r", (unsigned long) time(NULL), fabs(own_value[3] - ref_value[3]));
+    UART_PRINT("\n\r");
 }
 
 
